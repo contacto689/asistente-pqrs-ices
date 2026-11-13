@@ -23,7 +23,7 @@ ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "ices-admin-2026")
 COLAB_PASSWORD = os.environ.get("COLAB_PASSWORD", "ices-colab-2026")
 SECRET_KEY = os.environ.get("SECRET_KEY", "ices-hmac-default-key").encode("utf-8")
 
-client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
+client = genai.Client(api_key=GEMINI_API_KEY, http_options={'api_version': 'v1beta'}) if GEMINI_API_KEY else None
 
 # Registro en memoria de los PDFs activos (máximo 5 manuales institucionales)
 MAX_MANUALES = 5
