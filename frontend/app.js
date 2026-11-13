@@ -7,15 +7,28 @@ let perfilSeleccionado = "colaborador";
 let modoSeleccionado = "respuesta_pqrs";
 let tokenSesion = sessionStorage.getItem("ices_token") || "";
 let rolSesion = sessionStorage.getItem("ices_rol") || "";
-let ultimaRespuestaTexto = "";
+let ultimaCartaLimpia = "";
 let historialChat = [];
 let leyendoVoz = false;
 let escalaFuente = 100;
 
 window.onload = async () => {
     verificarServidor();
+
+    // Atajos de teclado accesibles (Esc cierra modales, Ctrl+Enter envía)
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+            cerrarModalGuia();
+            document.getElementById("menu-accesibilidad").classList.add("hidden");
+            document.getElementById("popover-pii").classList.add("hidden");
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && document.activeElement.id === "texto-pqrs") {
+            procesarConsulta();
+        }
+    });
+
     if (tokenSesion && rolSesion) {
-        mostrarPanelAutenticado();
+        mostrarPanelAutenticado(false);
     }
 };
 
@@ -33,6 +46,21 @@ async function verificarServidor() {
     }
 }
 
+// --- MODAL DE INDUCCIÓN (GUÍA DE USO) ---
+function abrirModalGuia() {
+    const modal = document.getElementById("modal-guia");
+    modal.classList.remove("hidden");
+    modal.querySelector("button").focus();
+}
+
+function cerrarModalGuia() {
+    const check = document.getElementById("check-no-mostrar-guia");
+    if (check && check.checked) {
+        sessionStorage.setItem("icfes_ocultar_guia", "1");
+    }
+    document.getElementById("modal-guia").classList.add("hidden");
+}
+
 function seleccionarPerfil(perfil) {
     perfilSeleccionado = perfil;
     const btnColab = document.getElementById("btn-perfil-colab");
@@ -41,11 +69,15 @@ function seleccionarPerfil(perfil) {
 
     if (perfil === "colaborador") {
         btnColab.className = "p-3.5 rounded-xl border-2 border-icfes-navy bg-icfes-navy/5 text-left transition-all";
+        btnColab.setAttribute("aria-checked", "true");
         btnAdmin.className = "p-3.5 rounded-xl border-2 border-slate-200 bg-white hover:border-icfes-navy/40 text-left transition-all";
+        btnAdmin.setAttribute("aria-checked", "false");
         label.innerText = "Colaborador";
     } else {
         btnAdmin.className = "p-3.5 rounded-xl border-2 border-icfes-navy bg-icfes-navy/5 text-left transition-all";
+        btnAdmin.setAttribute("aria-checked", "true");
         btnColab.className = "p-3.5 rounded-xl border-2 border-slate-200 bg-white hover:border-icfes-navy/40 text-left transition-all";
+        btnColab.setAttribute("aria-checked", "false");
         label.innerText = "Administrativo";
     }
 }
@@ -57,11 +89,21 @@ function seleccionarModo(modo) {
 
     if (modo === "respuesta_pqrs") {
         btnResp.className = "p-3.5 rounded-xl border-2 border-icfes-navy bg-icfes-navy/5 text-left transition-all";
+        btnResp.setAttribute("aria-checked", "true");
         btnCons.className = "p-3.5 rounded-xl border-2 border-slate-200 bg-white hover:border-icfes-navy/40 text-left transition-all";
+        btnCons.setAttribute("aria-checked", "false");
     } else {
         btnCons.className = "p-3.5 rounded-xl border-2 border-icfes-navy bg-icfes-navy/5 text-left transition-all";
+        btnCons.setAttribute("aria-checked", "true");
         btnResp.className = "p-3.5 rounded-xl border-2 border-slate-200 bg-white hover:border-icfes-navy/40 text-left transition-all";
+        btnResp.setAttribute("aria-checked", "false");
     }
+}
+
+function usarPlantillaRapida(textoPlantilla) {
+    const textarea = document.getElementById("texto-pqrs");
+    textarea.value = textoPlantilla;
+    textarea.focus();
 }
 
 async function iniciarSesion(e) {
@@ -89,7 +131,7 @@ async function iniciarSesion(e) {
         sessionStorage.setItem("ices_token", tokenSesion);
         sessionStorage.setItem("ices_rol", rolSesion);
         document.getElementById("input-password").value = "";
-        mostrarPanelAutenticado();
+        mostrarPanelAutenticado(true);
     } catch (err) {
         elError.innerText = err.message;
         elError.classList.remove("hidden");
@@ -101,20 +143,22 @@ async function iniciarSesion(e) {
 
 function limpiarConversacion() {
     detenerLectorVoz();
-    ultimaRespuestaTexto = "";
+    ultimaCartaLimpia = "";
     historialChat = [];
     document.getElementById("texto-pqrs").value = "";
     document.getElementById("badge-habeas").classList.add("hidden");
+    document.getElementById("popover-pii").classList.add("hidden");
     document.getElementById("btn-copiar").classList.add("hidden");
+    document.getElementById("btn-descargar").classList.add("hidden");
     document.getElementById("btn-voz").classList.add("hidden");
     document.getElementById("contenedor-respuesta").innerHTML = `
         <div class="flex items-start gap-3 text-slate-600 animate-view">
-            <div class="w-8 h-8 rounded-full bg-icfes-navy text-white flex items-center justify-center font-display font-bold text-xs shrink-0 mt-0.5">
+            <div class="w-8 h-8 rounded-full bg-icfes-navy text-white flex items-center justify-center font-display font-bold text-xs shrink-0 mt-0.5" aria-hidden="true">
                 IA
             </div>
             <div class="text-sm leading-relaxed">
                 <p class="font-semibold text-icfes-deep">¡Bienvenido al Asistente PQRS del ICFES!</p>
-                <p class="mt-1 text-slate-500">Escríbeme una consulta normativa o pega el texto de una solicitud ciudadana. Generaré una respuesta institucional fundamentada y podrás escucharla con el lector de voz integrado.</p>
+                <p class="mt-1 text-slate-500">Escríbeme una consulta normativa o pega una solicitud ciudadana. Generaré una respuesta institucional con membrete oficial, clasificación automática y lectura por voz.</p>
             </div>
         </div>
     `;
@@ -132,7 +176,7 @@ function cerrarSesion() {
     document.getElementById("vista-login").classList.remove("hidden");
 }
 
-function mostrarPanelAutenticado() {
+function mostrarPanelAutenticado(recienLogueado) {
     document.getElementById("vista-login").classList.add("hidden");
     document.getElementById("vista-panel").classList.remove("hidden");
     document.getElementById("barra-sesion").classList.remove("hidden");
@@ -146,6 +190,10 @@ function mostrarPanelAutenticado() {
     } else {
         document.getElementById("modulo-admin").classList.add("hidden");
         document.getElementById("banner-docs-colaborador").classList.remove("hidden");
+    }
+
+    if (recienLogueado && !sessionStorage.getItem("icfes_ocultar_guia")) {
+        abrirModalGuia();
     }
 
     cargarDocumentos();
@@ -177,7 +225,7 @@ async function cargarDocumentos() {
                             <div class="text-[11px] text-slate-500">${doc.size_mb} MB · Cargado: ${doc.fecha}</div>
                         </div>
                     </div>
-                    <button onclick="eliminarManual('${doc.id}')" class="text-xs text-rose-600 hover:bg-rose-50 font-bold px-3 py-1.5 rounded-full transition">
+                    <button type="button" onclick="eliminarManual('${doc.id}')" class="text-xs text-rose-600 hover:bg-rose-50 font-bold px-3 py-1.5 rounded-full transition">
                         Eliminar
                     </button>
                 </div>
@@ -262,11 +310,39 @@ function formatearTextoSeguro(str) {
     return escapado.replace(/\*\*(.+?)\*\*/g, '<strong class="text-icfes-deep font-bold">$1</strong>');
 }
 
+// Parsear respuesta estructurada (Clasificación + Carta Oficial + Soporte Interno)
+function parsearRespuestaEstructurada(texto) {
+    const tieneBloques = texto.includes("[[CARTA_OFICIAL]]");
+    if (!tieneBloques) {
+        return { estructurada: false, textoPlano: texto };
+    }
+
+    let clasificacion = { tipo: "PQRS", tema: "Institucional", plazo: "15 días hábiles" };
+    const matchClasif = texto.match(/\[\[CLASIFICACION\]\]([\s\S]*?)\[\[CARTA_OFICIAL\]\]/);
+    if (matchClasif) {
+        const bloque = matchClasif[1];
+        const t = bloque.match(/Tipo:\s*(.+)/i);
+        const m = bloque.match(/Tema:\s*(.+)/i);
+        const p = bloque.match(/Plazo:\s*(.+)/i);
+        if (t) clasificacion.tipo = t[1].trim();
+        if (m) clasificacion.tema = m[1].trim();
+        if (p) clasificacion.plazo = p[1].trim();
+    }
+
+    const matchCarta = texto.match(/\[\[CARTA_OFICIAL\]\]([\s\S]*?)(\[\[SOPORTE_INTERNO\]\]|$)/);
+    const carta = matchCarta ? matchCarta[1].trim() : texto;
+
+    const matchSoporte = texto.match(/\[\[SOPORTE_INTERNO\]\]([\s\S]*)$/);
+    const soporte = matchSoporte ? matchSoporte[1].trim() : "";
+
+    return { estructurada: true, clasificacion, carta, soporte };
+}
+
 function renderizarChat() {
     const contenedor = document.getElementById("contenedor-respuesta");
     if (historialChat.length === 0) return;
 
-    contenedor.innerHTML = historialChat.map(msg => {
+    contenedor.innerHTML = historialChat.map((msg, idx) => {
         if (msg.rol === "user") {
             return `
                 <div class="mb-4 flex justify-end animate-view">
@@ -274,9 +350,53 @@ function renderizarChat() {
                 </div>
             `;
         } else {
+            const parsed = parsearRespuestaEstructurada(msg.texto);
+            if (!parsed.estructurada) {
+                return `
+                    <div class="mb-4 flex justify-start animate-view">
+                        <div class="max-w-[96%] bg-white border border-icfes-border text-slate-800 rounded-2xl rounded-bl-sm px-4 py-3.5 text-sm leading-relaxed shadow-xs whitespace-pre-wrap">${formatearTextoSeguro(parsed.textoPlano)}</div>
+                    </div>
+                `;
+            }
+
             return `
-                <div class="mb-4 flex justify-start animate-view">
-                    <div class="max-w-[96%] bg-white border border-icfes-border text-slate-800 rounded-2xl rounded-bl-sm px-4 py-3.5 text-sm leading-relaxed shadow-xs whitespace-pre-wrap">${formatearTextoSeguro(msg.texto)}</div>
+                <div class="mb-5 space-y-3 animate-view">
+                    <!-- Chips de Clasificación Automática -->
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="text-[11px] font-bold bg-icfes-navy text-white px-3 py-1 rounded-full">
+                            Tipo: ${escapeHTML(parsed.clasificacion.tipo)}
+                        </span>
+                        <span class="text-[11px] font-bold bg-icfes-teal/15 text-icfes-teal border border-icfes-teal/30 px-3 py-1 rounded-full">
+                            Tema: ${escapeHTML(parsed.clasificacion.tema)}
+                        </span>
+                        <span class="text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200 px-3 py-1 rounded-full">
+                            Plazo: ${escapeHTML(parsed.clasificacion.plazo)}
+                        </span>
+                    </div>
+
+                    <!-- Tarjeta A: Carta Oficial con Membrete ICFES -->
+                    <article aria-label="Borrador oficial para enviar al ciudadano"
+                        class="bg-white border-2 border-icfes-navy/20 rounded-2xl overflow-hidden shadow-sm">
+                        <div class="bg-icfes-navy/5 border-b border-icfes-border px-4 py-2.5 flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="font-display font-extrabold text-sm text-icfes-navy">icfes</span>
+                                <span class="text-xs font-bold text-icfes-deep">· Borrador Oficial para Ciudadano</span>
+                            </div>
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-icfes-green">Listo para envío</span>
+                        </div>
+                        <div class="p-4 sm:p-5 text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">${formatearTextoSeguro(parsed.carta)}</div>
+                    </article>
+
+                    <!-- Tarjeta B: Soporte Interno Plegable (Solo Funcionario) -->
+                    ${parsed.soporte ? `
+                    <details class="bg-slate-100/90 border border-slate-200 rounded-xl overflow-hidden">
+                        <summary class="px-4 py-2.5 text-xs font-bold text-icfes-deep cursor-pointer select-none flex items-center justify-between hover:bg-slate-200/60 transition">
+                            <span>🔒 Soporte Documental Interno (Solo uso funcionario ICFES)</span>
+                            <span class="text-[11px] text-icfes-navy underline">Ver respaldo</span>
+                        </summary>
+                        <div class="px-4 py-3 text-xs text-slate-700 leading-relaxed border-t border-slate-200 whitespace-pre-wrap bg-white/70">${formatearTextoSeguro(parsed.soporte)}</div>
+                    </details>
+                    ` : ""}
                 </div>
             `;
         }
@@ -292,6 +412,7 @@ async function procesarConsulta() {
     const btn = document.getElementById("btn-consultar");
     const badgeHabeas = document.getElementById("badge-habeas");
     const btnCopiar = document.getElementById("btn-copiar");
+    const btnDescargar = document.getElementById("btn-descargar");
     const btnVoz = document.getElementById("btn-voz");
 
     if (!texto) return;
@@ -330,25 +451,74 @@ async function procesarConsulta() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Error al procesar consulta");
 
-        ultimaRespuestaTexto = data.respuesta;
+        const parsed = parsearRespuestaEstructurada(data.respuesta);
+        ultimaCartaLimpia = parsed.estructurada ? parsed.carta : data.respuesta;
+
         historialChat.push({ rol: "assistant", texto: data.respuesta });
         renderizarChat();
 
+        // Actualizar auditoría PII
         badgeHabeas.innerText = `🛡️ ${data.datos_anonimizados} dato(s) PII protegido(s)`;
         badgeHabeas.classList.remove("hidden");
+
+        const det = data.detalle_pii || {};
+        document.getElementById("contenido-auditoria-pii").innerHTML = `
+            <div>• Nombres propios: <strong>${det.nombres || 0}</strong></div>
+            <div>• Documentos ID: <strong>${det.documentos || 0}</strong></div>
+            <div>• Teléfonos: <strong>${det.telefonos || 0}</strong></div>
+            <div>• Correos: <strong>${det.correos || 0}</strong></div>
+        `;
+
         btnCopiar.classList.remove("hidden");
+        btnDescargar.classList.remove("hidden");
         btnVoz.classList.remove("hidden");
     } catch (err) {
         historialChat.pop();
         renderizarChat();
-        contenedor.innerHTML += `<p class="text-xs font-semibold text-rose-600 mt-2">${escapeHTML(err.message)}</p>`;
+        contenedor.innerHTML += `<p role="alert" class="text-xs font-semibold text-rose-600 mt-2">${escapeHTML(err.message)}</p>`;
     } finally {
         btn.disabled = false;
         btn.innerText = "Analizar y Generar Respuesta";
     }
 }
 
-// --- LECTOR POR VOZ (TEXT-TO-SPEECH EN ESPAÑOL) ---
+function toggleDetallePII() {
+    const pop = document.getElementById("popover-pii");
+    const badge = document.getElementById("badge-habeas");
+    const oculto = pop.classList.toggle("hidden");
+    badge.setAttribute("aria-expanded", String(!oculto));
+}
+
+// --- EXPORTAR DOCUMENTO WORD INSTITUCIONAL (.DOC) ---
+function descargarDocumentoOficial() {
+    if (!ultimaCartaLimpia) return;
+    const fechaHoy = new Date().toLocaleDateString("es-CO", { year: "numeric", month: "long", day: "numeric" });
+    const contenidoHtml = `
+        <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+        <head><meta charset='utf-8'><title>Respuesta Oficial ICFES</title></head>
+        <body style="font-family: Arial, sans-serif; color: #1E293B; line-height: 1.6; margin: 40px;">
+            <div style="border-bottom: 3px solid #0B4A7E; padding-bottom: 12px; margin-bottom: 24px;">
+                <h2 style="color: #0B4A7E; margin: 0;">ICFES — Instituto Colombiano para la Evaluación de la Educación</h2>
+                <p style="font-size: 12px; color: #64748B; margin: 4px 0 0 0;">Atención y Servicios a la Ciudadanía · Gestión PQRS</p>
+            </div>
+            <p style="font-size: 13px; color: #475569;">Bogotá D.C., ${fechaHoy}</p>
+            <div style="font-size: 14px; white-space: pre-wrap; margin-top: 20px;">${escapeHTML(ultimaCartaLimpia).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')}</div>
+            <div style="border-top: 1px solid #CBD5E1; margin-top: 40px; padding-top: 10px; font-size: 11px; color: #64748B;">
+                Instituto Colombiano para la Evaluación de la Educación - ICFES · Calle 26 No. 69-76, Edificio Elemento, Bogotá D.C.
+            </div>
+        </body>
+        </html>
+    `;
+    const blob = new Blob(['\ufeff', contenidoHtml], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Respuesta_PQRS_ICFES_${new Date().toISOString().slice(0, 10)}.doc`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// --- LECTOR POR VOZ ---
 function alternarLectorVoz() {
     if (!("speechSynthesis" in window)) {
         alert("Tu navegador no soporta lectura por voz.");
@@ -358,13 +528,13 @@ function alternarLectorVoz() {
         detenerLectorVoz();
         return;
     }
-    if (!ultimaRespuestaTexto) return;
+    if (!ultimaCartaLimpia) return;
 
     window.speechSynthesis.cancel();
-    const textoLimpio = ultimaRespuestaTexto.replace(/\*\*/g, "").replace(/[#_]/g, "");
+    const textoLimpio = ultimaCartaLimpia.replace(/\*\*/g, "").replace(/[#_]/g, "");
     const utterance = new SpeechSynthesisUtterance(textoLimpio);
     utterance.lang = "es-CO";
-    utterance.rate = 1.02;
+    utterance.rate = 1.0;
 
     utterance.onstart = () => {
         leyendoVoz = true;
@@ -396,7 +566,7 @@ function detenerLectorVoz() {
     if (txt) txt.innerText = "Escuchar";
 }
 
-// --- DICTADO POR VOZ (SPEECH-TO-TEXT) ---
+// --- DICTADO POR VOZ ---
 function alternarDictadoVoz() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -415,19 +585,22 @@ function alternarDictadoVoz() {
         const textarea = document.getElementById("texto-pqrs");
         textarea.value = (textarea.value ? textarea.value + " " : "") + transcripcion;
     };
-    recognition.onend = () => { label.innerText = "Dictar"; };
-    recognition.onerror = () => { label.innerText = "Dictar"; };
+    recognition.onend = () => { label.innerText = "Dictar por voz"; };
+    recognition.onerror = () => { label.innerText = "Dictar por voz"; };
 
     recognition.start();
 }
 
-// --- ACCESIBILIDAD ---
+// --- ACCESIBILIDAD INCLUSIVA (WCAG 2.1 AA) ---
 function toggleMenuAccesibilidad() {
-    document.getElementById("menu-accesibilidad").classList.toggle("hidden");
+    const menu = document.getElementById("menu-accesibilidad");
+    const btn = document.getElementById("btn-accesibilidad");
+    const oculto = menu.classList.toggle("hidden");
+    btn.setAttribute("aria-expanded", String(!oculto));
 }
 
 function cambiarTamanoTexto(delta) {
-    escalaFuente = Math.min(125, Math.max(90, escalaFuente + delta * 5));
+    escalaFuente = Math.min(130, Math.max(90, escalaFuente + delta * 5));
     document.documentElement.style.fontSize = `${escalaFuente}%`;
 }
 
@@ -435,12 +608,26 @@ function alternarContraste() {
     document.body.classList.toggle("high-contrast");
 }
 
+function alternarDislexia() {
+    document.body.classList.toggle("dyslexia-mode");
+}
+
+function alternarEscalaGrises() {
+    document.body.classList.toggle("grayscale-mode");
+}
+
+function restablecerAccesibilidad() {
+    escalaFuente = 100;
+    document.documentElement.style.fontSize = "100%";
+    document.body.classList.remove("high-contrast", "dyslexia-mode", "grayscale-mode");
+}
+
 function copiarRespuesta() {
-    if (!ultimaRespuestaTexto) return;
-    navigator.clipboard.writeText(ultimaRespuestaTexto);
+    if (!ultimaCartaLimpia) return;
+    navigator.clipboard.writeText(ultimaCartaLimpia.replace(/\*\*/g, ""));
     const btn = document.getElementById("btn-copiar");
-    btn.innerText = "¡Copiado!";
-    setTimeout(() => { btn.innerText = "Copiar texto"; }, 2000);
+    btn.innerText = "¡Carta copiada!";
+    setTimeout(() => { btn.innerText = "Copiar carta"; }, 2000);
 }
 
 function escapeHTML(str) {

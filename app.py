@@ -14,7 +14,7 @@ from google.genai import types
 load_dotenv()
 
 app = Flask(__name__, static_folder='frontend', static_url_path='')
-app.config['MAX_CONTENT_LENGTH'] = 25 * 1024 * 1024  # Límite 25 MB por petición
+app.config['MAX_CONTENT_LENGTH'] = 25 * 1024 * 1024
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
@@ -28,7 +28,6 @@ MAX_MANUALES = 5
 MANUALES_ACTIVOS = {}
 
 
-# --- CAPA DE SEGURIDAD Y CIFRADO DE SESIÓN ---
 def generar_token(rol: str) -> str:
     expira = int(time.time()) + (8 * 3600)
     payload = f"{rol}:{expira}"
@@ -72,15 +71,19 @@ def reparar_encoding(nombre: str) -> str:
         return nombre
 
 
-# --- CAPA DE PROTECCIÓN / ANONIMIZACIÓN DE DATOS PERSONALES (HABEAS DATA) ---
 def anonimizar_datos_personales(texto: str):
-    redacciones = 0
+    detalle = {
+        "correos": 0,
+        "telefonos": 0,
+        "documentos": 0,
+        "nombres": 0
+    }
 
     texto, n = re.subn(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', '[EMAIL_PROTEGIDO]', texto)
-    redacciones += n
+    detalle["correos"] += n
 
     texto, n = re.subn(r'(?<!\d)(\+?57\s*)?(3\d{2}[\s-]?\d{3}[\s-]?\d{4}|\d{7,10})(?!\d)', '[TELEFONO_PROTEGIDO]', texto)
-    redacciones += n
+    detalle["telefonos"] += n
 
     texto, n = re.subn(
         r'\b(CC|C\.C\.|TI|T\.I\.|NIT|CE|Identificación|Cédula)\s*[:#-]?\s*[\d.,]{5,15}\b',
@@ -88,19 +91,28 @@ def anonimizar_datos_personales(texto: str):
         texto,
         flags=re.IGNORECASE
     )
-    redacciones += n
+    detalle["documentos"] += n
 
     texto, n = re.subn(
-        r'(Peticionario|Solicitante|Nombre|Ciudadano|Suscrito|Remitente)\s*[:]\s*([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){1,3})',
+        r'(Peticionario|Solicitante|Nombre|Ciudadano|Suscrito|Remitente)\s*[:]\s*([A-Za-zÁÉÍÓÚÑáéíóúñ]+(?:\s+[A-Za-zÁÉÍÓÚÑáéíóúñ]+){1,3})',
         r'\1: [NOMBRE_PROTEGIDO]',
-        texto
+        texto,
+        flags=re.IGNORECASE
     )
-    redacciones += n
+    detalle["nombres"] += n
 
-    return texto, redacciones
+    texto, n = re.subn(
+        r'\b(soy|mi nombre es|me llamo)\s+([A-Za-zÁÉÍÓÚÑáéíóúñ]+(?:\s+[A-Za-zÁÉÍÓÚÑáéíóúñ]+){1,3})(?=[,.\n]|$)',
+        r'\1 [NOMBRE_PROTEGIDO]',
+        texto,
+        flags=re.IGNORECASE
+    )
+    detalle["nombres"] += n
+
+    total = sum(detalle.values())
+    return texto, total, detalle
 
 
-# --- RUTAS PÚBLICAS ---
 @app.route('/')
 def index():
     return send_from_directory(app.static_folder, 'index.html')
@@ -110,8 +122,8 @@ def index():
 def health():
     return jsonify({
         "status": "ok",
-        "proyecto": "Asistente PQRS ICES",
-        "version": "2.2-conversational",
+        "proyecto": "Asistente PQRS ICFES",
+        "version": "3.0-enterprise",
         "manuales_cargados": len(MANUALES_ACTIVOS)
     }), 200
 
@@ -130,7 +142,6 @@ def login():
     return jsonify({"error": "Credenciales incorrectas para el perfil seleccionado."}), 401
 
 
-# --- RUTAS DE GESTIÓN DOCUMENTAL ---
 @app.route('/api/documentos', methods=['GET'])
 @requiere_rol(["admin", "colaborador"])
 def listar_documentos():
@@ -148,7 +159,7 @@ def subir_documento():
         return jsonify({"error": "GEMINI_API_KEY no configurada en el servidor."}), 500
 
     if len(MANUALES_ACTIVOS) >= MAX_MANUALES:
-        return jsonify({"error": f"Límite alcanzado: máximo {MAX_MANUALES} manuales PDF activos. Elimine uno antes de subir otro."}), 400
+        return jsonify({"error": f"Límite alcanzado: máximo {MAX_MANUALES} manuales PDF activos."}), 400
 
     if 'archivo' not in request.files:
         return jsonify({"error": "No se recibió ningún archivo PDF."}), 400
@@ -214,7 +225,6 @@ def eliminar_documento(doc_id):
     return jsonify({"mensaje": f"Manual '{nombre}' eliminado correctamente."})
 
 
-# --- RUTA CONVERSACIONAL Y DE REDACCIÓN PQRS ---
 @app.route('/api/consultar', methods=['POST'])
 @requiere_rol(["admin", "colaborador"])
 def consultar_pqrs():
@@ -223,59 +233,60 @@ def consultar_pqrs():
 
     if not MANUALES_ACTIVOS:
         return jsonify({
-            "error": "No hay manuales PDF cargados. El Administrador debe subir al menos un manual del ICES antes de iniciar."
+            "error": "No hay manuales PDF cargados. El Administrador debe subir al menos un manual del ICFES antes de iniciar."
         }), 400
 
     datos = request.get_json(silent=True) or {}
     modo = datos.get("modo", "respuesta_pqrs")
     texto_usuario = datos.get("texto", "").strip()
-    historial = datos.get("historial", [])  # Últimos turnos de conversación
+    historial = datos.get("historial", [])
 
     if not texto_usuario:
         return jsonify({"error": "Escribe un mensaje o pega el texto de la PQRS."}), 400
 
-    texto_seguro, datos_protegidos = anonimizar_datos_personales(texto_usuario)
+    texto_seguro, total_pii, detalle_pii = anonimizar_datos_personales(texto_usuario)
     nombres_manuales = ", ".join([v["display_name"] for v in MANUALES_ACTIVOS.values()])
 
     if modo == "respuesta_pqrs":
         instruccion_modo = (
-            "MODO ACTIVO: REDACCIÓN DE RESPUESTA OFICIAL PQRS.\n"
-            "- Si el usuario te saluda o conversa contigo antes de pegar la PQRS, respóndele de forma cordial, natural y profesional como su asistente IA del ICES, e invítalo a pegar el caso o la PQRS del ciudadano.\n"
-            "- Cuando el usuario te entregue el caso o la PQRS de un ciudadano, estructura una respuesta completa y clara con:\n"
-            "  1. Clasificación y plazo aplicable (si consta en los documentos).\n"
-            "  2. Borrador de respuesta formal al ciudadano (manteniendo intactas las etiquetas [NOMBRE_PROTEGIDO], [DOCUMENTO_PROTEGIDO], etc.).\n"
-            "  3. Fuentes exactas citadas de los documentos del ICES."
+            "MODO ACTIVO: REDACCIÓN DE RESPUESTA OFICIAL PQRS PARA EL CIUDADANO.\n"
+            "- Si el usuario solo saluda o hace una consulta general sin presentar un caso ciudadano, respóndele cordialmente como su Asistente IA del ICFES sin usar etiquetas de bloque.\n"
+            "- Cuando el usuario presente una PQRS o caso de un ciudadano, DEBES usar EXACTAMENTE estas etiquetas delimitadoras para que el sistema separe las tarjetas en pantalla:\n"
+            "[[CLASIFICACION]]\n"
+            "Tipo: <Petición | Queja | Reclamo | Sugerencia | Consulta>\n"
+            "Tema: <Ej: Pagos y Devoluciones | Inscripciones | Citaciones | Resultados | General>\n"
+            "Plazo: <Plazo legal según manuales o Ley 1755/2015, ej: 15 días hábiles>\n"
+            "[[CARTA_OFICIAL]]\n"
+            "<Redacta aquí únicamente la carta oficial formal, respetuosa y lista para enviar al ciudadano, dirigida a [NOMBRE_PROTEGIDO], explicando los pasos o requisitos según los documentos del ICFES. NUNCA incluyas citas textuales informales, marcas de tiempo de grabaciones ni nombres internos de funcionarios.>\n"
+            "[[SOPORTE_INTERNO]]\n"
+            "<Explica aquí al funcionario del ICFES en qué documento(s), sección o marca de tiempo exacta se respalda la respuesta y qué verificación interna debe realizar antes de enviar.>"
         )
     else:
         instruccion_modo = (
-            "MODO ACTIVO: ASISTENTE CONVERSACIONAL Y CONSULTA NORMATIVA DEL ICES.\n"
-            "- Conversa de manera fluida, amable, proactiva y clara con el colaborador, como un experto interno del ICES.\n"
-            "- Puedes saludar, resumir qué contienen los documentos cargados, responder preguntas específicas, hacer comparaciones o ayudarle a entender los procedimientos descritos en los PDFs, siempre citando el documento de respaldo."
+            "MODO ACTIVO: ASISTENTE CONVERSACIONAL Y CONSULTA INTERNA DEL ICFES.\n"
+            "- Conversa de forma natural, cercana y clara con el colaborador como su asistente experto del ICFES.\n"
+            "- Responde sus preguntas, resume procedimientos o aclara dudas citando con precisión el documento PDF correspondiente."
         )
 
     system_prompt = (
-        f"Eres el Asistente IA Oficial de Gestión de PQRS del ICES. Actualmente tienes cargados estos documentos institucionales: [{nombres_manuales}].\n\n"
-        "TU PERSONALIDAD Y ESTILO:\n"
-        "- Eres un asistente inteligente, cercano, ágil y profesional. Conversas de forma natural (como ChatGPT/Gemini), entiendes saludos, seguimientos y repreguntas del usuario sin sonar robótico.\n\n"
-        "REGLA DE ORO — CERO ALUCINACIONES EN DATOS Y PROCEDIMIENTOS:\n"
-        "- Todo dato normativo, plazo, tarifa, paso de proceso, requisito o política institucional que afirmes DEBE provenir estrictamente de los documentos PDF adjuntos.\n"
-        "- Nunca inventes reglas, artículos ni procedimientos que no estén en los PDFs.\n"
-        "- Si el usuario pregunta por un dato o procedimiento específico que NO aparece en los documentos cargados, díselo con amabilidad y claridad (por ejemplo: 'Revisé los documentos cargados y no encontré información específica sobre ese punto; te sugiero verificar si falta cargar el manual correspondiente'), y ofrece ayudarle con los temas que sí cubren los documentos actuales.\n"
-        "- Respeta siempre las etiquetas de anonimización ([NOMBRE_PROTEGIDO], [DOCUMENTO_PROTEGIDO], etc.).\n\n"
+        f"Eres el Asistente IA Oficial de Gestión de PQRS del ICFES. Documentos institucionales cargados: [{nombres_manuales}].\n\n"
+        "REGLA DE ORO — CERO ALUCINACIONES:\n"
+        "- Todo procedimiento, requisito, plazo o canal de atención que indiques DEBE basarse estrictamente en los PDFs adjuntos.\n"
+        "- Si un dato o requisito específico no aparece en los PDFs cargados, indícalo con claridad y sin inventar nada.\n"
+        "- Conserva siempre las etiquetas de anonimización ([NOMBRE_PROTEGIDO], [DOCUMENTO_PROTEGIDO], etc.).\n\n"
         f"{instruccion_modo}"
     )
 
-    # Construir contexto conversacional (PDFs + últimos 6 mensajes + mensaje actual)
     contenidos = [info["file_obj"] for info in MANUALES_ACTIVOS.values()]
 
     if historial:
         resumen_chat = "\n".join([
-            f"{'Colaborador' if m.get('rol') == 'user' else 'Asistente ICES'}: {m.get('texto', '')}"
+            f"{'Colaborador' if m.get('rol') == 'user' else 'Asistente ICFES'}: {m.get('texto', '')}"
             for m in historial[-6:]
         ])
-        contenidos.append(f"HISTORIAL RECIENTE DE LA CONVERSACIÓN:\n{resumen_chat}\n\nNUEVO MENSAJE DEL COLABORADOR:\n{texto_seguro}")
+        contenidos.append(f"HISTORIAL RECIENTE:\n{resumen_chat}\n\nNUEVO MENSAJE:\n{texto_seguro}")
     else:
-        contenidos.append(f"MENSAJE DEL COLABORADOR:\n{texto_seguro}")
+        contenidos.append(f"MENSAJE:\n{texto_seguro}")
 
     try:
         respuesta = client.models.generate_content(
@@ -289,7 +300,8 @@ def consultar_pqrs():
 
         return jsonify({
             "respuesta": respuesta.text,
-            "datos_anonimizados": datos_protegidos,
+            "datos_anonimizados": total_pii,
+            "detalle_pii": detalle_pii,
             "manuales_consultados": [v["display_name"] for v in MANUALES_ACTIVOS.values()]
         })
     except Exception as e:
