@@ -17,7 +17,6 @@ app = Flask(__name__, static_folder='frontend', static_url_path='')
 app.config['MAX_CONTENT_LENGTH'] = 25 * 1024 * 1024  # Límite 25 MB por petición
 CORS(app, resources={r"/*": {"origins": "*"}})
 
-# Configuración de seguridad y credenciales
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "ices-admin-2026")
 COLAB_PASSWORD = os.environ.get("COLAB_PASSWORD", "ices-colab-2026")
@@ -25,14 +24,13 @@ SECRET_KEY = os.environ.get("SECRET_KEY", "ices-hmac-default-key").encode("utf-8
 
 client = genai.Client(api_key=GEMINI_API_KEY, http_options={'api_version': 'v1beta'}) if GEMINI_API_KEY else None
 
-# Registro en memoria de los PDFs activos (máximo 5 manuales institucionales)
 MAX_MANUALES = 5
-MANUALES_ACTIVOS = {}  # { file_name_api: { "display_name": str, "size_mb": float, "uploaded_at": str } }
+MANUALES_ACTIVOS = {}
 
 
 # --- CAPA DE SEGURIDAD Y CIFRADO DE SESIÓN ---
 def generar_token(rol: str) -> str:
-    expira = int(time.time()) + (8 * 3600)  # Sesión válida por 8 horas
+    expira = int(time.time()) + (8 * 3600)
     payload = f"{rol}:{expira}"
     firma = hmac.new(SECRET_KEY, payload.encode("utf-8"), hashlib.sha256).hexdigest()
     return f"{payload}:{firma}"
@@ -67,24 +65,31 @@ def requiere_rol(roles_permitidos):
     return decorador
 
 
+def reparar_encoding(nombre: str) -> str:
+    try:
+        return nombre.encode('latin-1').decode('utf-8')
+    except Exception:
+        return nombre
+
+
 # --- CAPA DE PROTECCIÓN / ANONIMIZACIÓN DE DATOS PERSONALES (HABEAS DATA) ---
 def anonimizar_datos_personales(texto: str):
-    """Enmascara correos, cédulas/NIT, teléfonos y nombres tras etiquetas comunes antes de salir a la IA."""
     redacciones = 0
 
-    # 1. Correos electrónicos
     texto, n = re.subn(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', '[EMAIL_PROTEGIDO]', texto)
     redacciones += n
 
-    # 2. Teléfonos / Celulares (7 a 12 dígitos)
     texto, n = re.subn(r'(?<!\d)(\+?57\s*)?(3\d{2}[\s-]?\d{3}[\s-]?\d{4}|\d{7,10})(?!\d)', '[TELEFONO_PROTEGIDO]', texto)
     redacciones += n
 
-    # 3. Cédulas / Documentos con puntos o prefijos CC/NIT/TI
-    texto, n = re.subn(r'\b(CC|C\.C\.|TI|T\.I\.|NIT|CE|Identificación|Cédula)\s*[:#-]?\s*[\d.,]{5,15}\b', r'\1 [DOCUMENTO_PROTEGIDO]', texto, flags=re.IGNORECASE)
+    texto, n = re.subn(
+        r'\b(CC|C\.C\.|TI|T\.I\.|NIT|CE|Identificación|Cédula)\s*[:#-]?\s*[\d.,]{5,15}\b',
+        r'\1 [DOCUMENTO_PROTEGIDO]',
+        texto,
+        flags=re.IGNORECASE
+    )
     redacciones += n
 
-    # 4. Nombres propios explícitos tras etiquetas típicas en PQRS
     texto, n = re.subn(
         r'(Peticionario|Solicitante|Nombre|Ciudadano|Suscrito|Remitente)\s*[:]\s*([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){1,3})',
         r'\1: [NOMBRE_PROTEGIDO]',
@@ -106,7 +111,7 @@ def health():
     return jsonify({
         "status": "ok",
         "proyecto": "Asistente PQRS ICES",
-        "version": "2.1-secure",
+        "version": "2.2-conversational",
         "manuales_cargados": len(MANUALES_ACTIVOS)
     }), 200
 
@@ -125,7 +130,7 @@ def login():
     return jsonify({"error": "Credenciales incorrectas para el perfil seleccionado."}), 401
 
 
-# --- RUTAS DE GESTIÓN DOCUMENTAL (SOLO ADMINISTRADOR) ---
+# --- RUTAS DE GESTIÓN DOCUMENTAL ---
 @app.route('/api/documentos', methods=['GET'])
 @requiere_rol(["admin", "colaborador"])
 def listar_documentos():
@@ -149,7 +154,9 @@ def subir_documento():
         return jsonify({"error": "No se recibió ningún archivo PDF."}), 400
 
     archivo = request.files['archivo']
-    if not archivo.filename.lower().endswith('.pdf'):
+    nombre_limpio = reparar_encoding(archivo.filename or "manual.pdf")
+
+    if not nombre_limpio.lower().endswith('.pdf'):
         return jsonify({"error": "Solo se permiten manuales en formato PDF."}), 400
 
     contenido = archivo.read()
@@ -157,7 +164,6 @@ def subir_documento():
     if size_mb > 20.0:
         return jsonify({"error": f"El archivo pesa {size_mb} MB y supera el máximo permitido de 20 MB."}), 400
 
-    # Guardar temporalmente de forma segura, subir a Gemini Files API y borrar archivo temporal local
     tmp_path = None
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
@@ -167,23 +173,23 @@ def subir_documento():
         uploaded_file = client.files.upload(
             file=tmp_path,
             config=types.UploadFileConfig(
-                display_name=archivo.filename,
+                display_name=nombre_limpio,
                 mime_type="application/pdf"
             )
         )
 
         MANUALES_ACTIVOS[uploaded_file.name] = {
             "file_obj": uploaded_file,
-            "display_name": archivo.filename,
+            "display_name": nombre_limpio,
             "size_mb": size_mb,
             "uploaded_at": time.strftime("%Y-%m-%d %H:%M")
         }
 
         return jsonify({
-            "mensaje": f"Manual '{archivo.filename}' cargado y cifrado en el motor documental.",
+            "mensaje": f"Manual '{nombre_limpio}' cargado y cifrado en el motor documental.",
             "documento": {
                 "id": uploaded_file.name,
-                "nombre": archivo.filename,
+                "nombre": nombre_limpio,
                 "size_mb": size_mb
             }
         }), 201
@@ -208,7 +214,7 @@ def eliminar_documento(doc_id):
     return jsonify({"mensaje": f"Manual '{nombre}' eliminado correctamente."})
 
 
-# --- RUTA DE CONSULTA Y REDACCIÓN PQRS (ADMINISTRADOR Y COLABORADOR) ---
+# --- RUTA CONVERSACIONAL Y DE REDACCIÓN PQRS ---
 @app.route('/api/consultar', methods=['POST'])
 @requiere_rol(["admin", "colaborador"])
 def consultar_pqrs():
@@ -217,48 +223,59 @@ def consultar_pqrs():
 
     if not MANUALES_ACTIVOS:
         return jsonify({
-            "error": "No hay manuales PDF cargados. El Administrador debe subir al menos un manual del ICES antes de realizar consultas."
+            "error": "No hay manuales PDF cargados. El Administrador debe subir al menos un manual del ICES antes de iniciar."
         }), 400
 
     datos = request.get_json(silent=True) or {}
-    modo = datos.get("modo", "respuesta_pqrs")  # 'respuesta_pqrs' o 'consulta_normativa'
+    modo = datos.get("modo", "respuesta_pqrs")
     texto_usuario = datos.get("texto", "").strip()
+    historial = datos.get("historial", [])  # Últimos turnos de conversación
 
     if not texto_usuario:
-        return jsonify({"error": "Debe ingresar el texto de la PQRS o la consulta."}), 400
+        return jsonify({"error": "Escribe un mensaje o pega el texto de la PQRS."}), 400
 
-    # Anonimización obligatoria antes de enviar a Gemini
     texto_seguro, datos_protegidos = anonimizar_datos_personales(texto_usuario)
+    nombres_manuales = ", ".join([v["display_name"] for v in MANUALES_ACTIVOS.values()])
 
     if modo == "respuesta_pqrs":
         instruccion_modo = (
-            "MODO: REDACCIÓN DE RESPUESTA OFICIAL DE PQRS DEL ICES.\n"
-            "Estructura la salida con:\n"
-            "1. CLASIFICACIÓN Y PLAZO LEGAL/INTERNO (según los manuales).\n"
-            "2. BORRADOR DE RESPUESTA FORMAL AL PETICIONARIO (tono institucional, claro y respetuoso, manteniendo intactas las etiquetas [NOMBRE_PROTEGIDO], [DOCUMENTO_PROTEGIDO], etc. para que el funcionario las complete localmente).\n"
-            "3. FUENTES CITADAS (indica el nombre exacto del PDF y capítulo/artículo/página de donde se extrajo cada fundamento)."
+            "MODO ACTIVO: REDACCIÓN DE RESPUESTA OFICIAL PQRS.\n"
+            "- Si el usuario te saluda o conversa contigo antes de pegar la PQRS, respóndele de forma cordial, natural y profesional como su asistente IA del ICES, e invítalo a pegar el caso o la PQRS del ciudadano.\n"
+            "- Cuando el usuario te entregue el caso o la PQRS de un ciudadano, estructura una respuesta completa y clara con:\n"
+            "  1. Clasificación y plazo aplicable (si consta en los documentos).\n"
+            "  2. Borrador de respuesta formal al ciudadano (manteniendo intactas las etiquetas [NOMBRE_PROTEGIDO], [DOCUMENTO_PROTEGIDO], etc.).\n"
+            "  3. Fuentes exactas citadas de los documentos del ICES."
         )
     else:
         instruccion_modo = (
-            "MODO: CONSULTA NORMATIVA INTERNA DEL ICES.\n"
-            "Responde de forma directa, técnica y estructurada a la pregunta del colaborador, citando textualmente "
-            "el nombre del manual PDF, sección o artículo exacto que respalda cada afirmación."
+            "MODO ACTIVO: ASISTENTE CONVERSACIONAL Y CONSULTA NORMATIVA DEL ICES.\n"
+            "- Conversa de manera fluida, amable, proactiva y clara con el colaborador, como un experto interno del ICES.\n"
+            "- Puedes saludar, resumir qué contienen los documentos cargados, responder preguntas específicas, hacer comparaciones o ayudarle a entender los procedimientos descritos en los PDFs, siempre citando el documento de respaldo."
         )
 
     system_prompt = (
-        "Eres el Asistente Oficial de Gestión de PQRS del ICES. "
-        "REGLA ABSOLUTA DE CERO ALUCINACIONES:\n"
-        "- Responde ÚNICA Y EXCLUSIVAMENTE utilizando la información contenida en los manuales PDF adjuntos.\n"
-        "- Tienes ESTRICTAMENTE PROHIBIDO usar conocimiento externo, suponer procedimientos o completar vacíos.\n"
-        "- Si los manuales adjuntos NO contienen información suficiente para responder total o parcialmente la solicitud, "
-        "decláralo explícitamente diciendo: '⚠️ SIN SOPORTE EN MANUALES CARGADOS: Los documentos oficiales del ICES cargados actualmente no contemplan este caso específico.'\n"
-        "- Nunca reveles ni intentes reconstruir datos personales enmascarados.\n\n"
+        f"Eres el Asistente IA Oficial de Gestión de PQRS del ICES. Actualmente tienes cargados estos documentos institucionales: [{nombres_manuales}].\n\n"
+        "TU PERSONALIDAD Y ESTILO:\n"
+        "- Eres un asistente inteligente, cercano, ágil y profesional. Conversas de forma natural (como ChatGPT/Gemini), entiendes saludos, seguimientos y repreguntas del usuario sin sonar robótico.\n\n"
+        "REGLA DE ORO — CERO ALUCINACIONES EN DATOS Y PROCEDIMIENTOS:\n"
+        "- Todo dato normativo, plazo, tarifa, paso de proceso, requisito o política institucional que afirmes DEBE provenir estrictamente de los documentos PDF adjuntos.\n"
+        "- Nunca inventes reglas, artículos ni procedimientos que no estén en los PDFs.\n"
+        "- Si el usuario pregunta por un dato o procedimiento específico que NO aparece en los documentos cargados, díselo con amabilidad y claridad (por ejemplo: 'Revisé los documentos cargados y no encontré información específica sobre ese punto; te sugiero verificar si falta cargar el manual correspondiente'), y ofrece ayudarle con los temas que sí cubren los documentos actuales.\n"
+        "- Respeta siempre las etiquetas de anonimización ([NOMBRE_PROTEGIDO], [DOCUMENTO_PROTEGIDO], etc.).\n\n"
         f"{instruccion_modo}"
     )
 
-    # Adjuntar todos los manuales activos + la consulta anonimizada
+    # Construir contexto conversacional (PDFs + últimos 6 mensajes + mensaje actual)
     contenidos = [info["file_obj"] for info in MANUALES_ACTIVOS.values()]
-    contenidos.append(f"SOLICITUD DEL FUNCIONARIO:\n{texto_seguro}")
+
+    if historial:
+        resumen_chat = "\n".join([
+            f"{'Colaborador' if m.get('rol') == 'user' else 'Asistente ICES'}: {m.get('texto', '')}"
+            for m in historial[-6:]
+        ])
+        contenidos.append(f"HISTORIAL RECIENTE DE LA CONVERSACIÓN:\n{resumen_chat}\n\nNUEVO MENSAJE DEL COLABORADOR:\n{texto_seguro}")
+    else:
+        contenidos.append(f"MENSAJE DEL COLABORADOR:\n{texto_seguro}")
 
     try:
         respuesta = client.models.generate_content(
@@ -266,7 +283,7 @@ def consultar_pqrs():
             contents=contenidos,
             config=types.GenerateContentConfig(
                 system_instruction=system_prompt,
-                temperature=0.0
+                temperature=0.2
             )
         )
 

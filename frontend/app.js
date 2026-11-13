@@ -8,6 +8,7 @@ let modoSeleccionado = "respuesta_pqrs";
 let tokenSesion = sessionStorage.getItem("ices_token") || "";
 let rolSesion = sessionStorage.getItem("ices_rol") || "";
 let ultimaRespuestaTexto = "";
+let historialChat = [];
 
 window.onload = async () => {
     verificarServidor();
@@ -101,6 +102,7 @@ async function iniciarSesion(e) {
 function cerrarSesion() {
     tokenSesion = "";
     rolSesion = "";
+    historialChat = [];
     sessionStorage.removeItem("ices_token");
     sessionStorage.removeItem("ices_rol");
     document.getElementById("vista-panel").classList.add("hidden");
@@ -138,7 +140,6 @@ async function cargarDocumentos() {
         const docs = data.documentos || [];
         document.getElementById("contador-docs").innerText = `${docs.length} / ${data.maximo} cargados`;
 
-        // Actualizar vista Administrador
         const listaAdmin = document.getElementById("lista-documentos-admin");
         if (docs.length === 0) {
             listaAdmin.innerHTML = `<p class="text-xs text-slate-500">Aún no hay manuales PDF cargados. Sube el primer documento para habilitar consultas.</p>`;
@@ -156,7 +157,6 @@ async function cargarDocumentos() {
             `).join("");
         }
 
-        // Actualizar banner Colaborador
         const nombresColab = document.getElementById("nombres-docs-colab");
         nombresColab.innerText = docs.length > 0
             ? docs.map(d => d.nombre).join("  |  ")
@@ -230,8 +230,35 @@ function mostrarAlertaAdmin(mensaje, esError) {
     alerta.classList.remove("hidden");
 }
 
+function renderizarChat() {
+    const contenedor = document.getElementById("contenedor-respuesta");
+    if (historialChat.length === 0) {
+        contenedor.innerHTML = `<p class="text-sm text-slate-500">Hola 👋 Soy tu Asistente IA del ICES. Escríbeme una consulta sobre los documentos cargados o pega el texto de una PQRS para ayudarte a redactar la respuesta.</p>`;
+        return;
+    }
+
+    contenedor.innerHTML = historialChat.map(msg => {
+        if (msg.rol === "user") {
+            return `
+                <div class="mb-4 flex justify-end">
+                    <div class="max-w-[85%] bg-amber-500/15 border border-amber-500/40 text-amber-100 rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap">${escapeHTML(msg.texto)}</div>
+                </div>
+            `;
+        } else {
+            return `
+                <div class="mb-4 flex justify-start">
+                    <div class="max-w-[95%] bg-slate-900 border border-slate-800 text-slate-200 rounded-2xl px-4 py-3.5 text-sm leading-relaxed whitespace-pre-wrap">${escapeHTML(msg.texto)}</div>
+                </div>
+            `;
+        }
+    }).join("");
+
+    contenedor.scrollTop = contenedor.scrollHeight;
+}
+
 async function procesarConsulta() {
-    const texto = document.getElementById("texto-pqrs").value.trim();
+    const inputEl = document.getElementById("texto-pqrs");
+    const texto = inputEl.value.trim();
     const contenedor = document.getElementById("contenedor-respuesta");
     const btn = document.getElementById("btn-consultar");
     const badgeHabeas = document.getElementById("badge-habeas");
@@ -240,10 +267,15 @@ async function procesarConsulta() {
     if (!texto) return;
 
     btn.disabled = true;
-    btn.innerText = "Anonimizando datos y consultando manuales...";
-    badgeHabeas.classList.add("hidden");
-    btnCopiar.classList.add("hidden");
-    contenedor.innerHTML = `<p class="text-sm text-amber-400 animate-pulse">Analizando estrictamente sobre los manuales oficiales del ICES...</p>`;
+    btn.innerText = "Pensando y verificando fuentes...";
+    inputEl.value = "";
+
+    const historialPrevio = [...historialChat];
+    historialChat.push({ rol: "user", texto });
+    renderizarChat();
+
+    contenedor.innerHTML += `<p id="indicador-escribiendo" class="text-xs text-amber-400 animate-pulse mt-2">Asistente ICES analizando documentos...</p>`;
+    contenedor.scrollTop = contenedor.scrollHeight;
 
     try {
         const res = await fetch(`${URL_BASE}/api/consultar`, {
@@ -252,20 +284,27 @@ async function procesarConsulta() {
                 "Content-Type": "application/json",
                 "Authorization": `Bearer ${tokenSesion}`
             },
-            body: JSON.stringify({ modo: modoSeleccionado, texto })
+            body: JSON.stringify({
+                modo: modoSeleccionado,
+                texto,
+                historial: historialPrevio
+            })
         });
         if (res.status === 403) return cerrarSesion();
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Error al procesar consulta");
 
         ultimaRespuestaTexto = data.respuesta;
-        contenedor.innerHTML = `<div class="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">${escapeHTML(data.respuesta)}</div>`;
+        historialChat.push({ rol: "assistant", texto: data.respuesta });
+        renderizarChat();
 
-        badgeHabeas.innerText = `🛡️ ${data.datos_anonimizados} dato(s) personal(es) enmascarado(s)`;
+        badgeHabeas.innerText = `🛡️ ${data.datos_anonimizados} dato(s) PII protegido(s)`;
         badgeHabeas.classList.remove("hidden");
         btnCopiar.classList.remove("hidden");
     } catch (err) {
-        contenedor.innerHTML = `<p class="text-sm text-rose-400">${escapeHTML(err.message)}</p>`;
+        historialChat.pop();
+        renderizarChat();
+        contenedor.innerHTML += `<p class="text-sm text-rose-400 mt-2">${escapeHTML(err.message)}</p>`;
     } finally {
         btn.disabled = false;
         btn.innerText = "Analizar y Generar Respuesta";
@@ -288,4 +327,4 @@ function escapeHTML(str) {
         "'": '&#39;',
         '"': '&quot;'
     }[tag]));
-}       
+}
