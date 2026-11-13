@@ -3,203 +3,426 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ICES | Asistente Oficial de Gestión PQRS</title>
+    <title>ICFES | Asistente Oficial de Gestión PQRS</title>
     <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Work Sans"', 'sans-serif'],
+                        display: ['"Montserrat"', 'sans-serif'],
+                    },
+                    colors: {
+                        icfes: {
+                            navy: '#0B4A7E',
+                            deep: '#072F54',
+                            teal: '#1CA39E',
+                            green: '#4E8A3D',
+                            gov: '#3366CC',
+                            light: '#F4F7FA',
+                            border: '#DCE5EF'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        html { scroll-behavior: smooth; }
+        body { font-family: 'Work Sans', sans-serif; transition: background-color 0.3s ease, color 0.3s ease; }
+        h1, h2, h3, .font-display { font-family: 'Montserrat', sans-serif; }
 
-    <!-- BARRA SUPERIOR -->
-    <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-30">
-        <div class="max-w-6xl mx-auto px-6 py-4 flex flex-wrap items-center justify-between gap-4">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 font-black flex items-center justify-center text-lg shadow-lg">
-                    IC
+        /* Fondo curvo estilo portal de inicio de sesión ICFES */
+        .icfes-login-bg {
+            background: radial-gradient(circle at 12% 10%, #4E8A3D 0%, transparent 28%),
+                        radial-gradient(circle at 85% 20%, #0B4A7E 0%, #051E36 65%, #3A4654 100%);
+        }
+
+        /* Animaciones y transiciones avanzadas */
+        @keyframes fadeSlideUp {
+            from { opacity: 0; transform: translateY(16px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes pulseWave {
+            0%, 100% { transform: scaleY(0.4); }
+            50% { transform: scaleY(1); }
+        }
+        .animate-view { animation: fadeSlideUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .card-hover {
+            transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s ease, border-color 0.28s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 14px 30px -10px rgba(11, 74, 126, 0.14);
+        }
+        .pill-btn {
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .pill-btn:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 20px -4px rgba(11, 74, 126, 0.35);
+        }
+        .pill-btn:active:not(:disabled) { transform: translateY(0); }
+
+        /* Barras ecualizador lector de voz */
+        .voice-bar { display: inline-block; width: 3px; height: 12px; background: currentColor; border-radius: 2px; animation: pulseWave 0.9s infinite ease-in-out; }
+        .voice-bar:nth-child(2) { animation-delay: 0.2s; }
+        .voice-bar:nth-child(3) { animation-delay: 0.4s; }
+
+        /* Modo Alto Contraste Accesibilidad */
+        body.high-contrast { background-color: #000 !important; color: #FFF !important; }
+        body.high-contrast .bg-white, body.high-contrast .bg-icfes-light { background-color: #0A0A0A !important; color: #FFF !important; border-color: #FFD700 !important; }
+        body.high-contrast input, body.high-contrast textarea { background-color: #111 !important; color: #FFF !important; border-color: #FFD700 !important; }
+    </style>
+</head>
+<body class="bg-icfes-light text-slate-800 min-h-screen flex flex-col antialiased">
+
+    <!-- FRANJA SUPERIOR GOV.CO / INSTITUCIONAL -->
+    <div class="bg-icfes-gov text-white text-[11px] py-1.5 px-4 sm:px-6">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <span class="font-semibold tracking-wide flex items-center gap-2">
+                <span class="font-display font-extrabold tracking-wider">GOV.CO</span>
+                <span class="opacity-75">|</span>
+                <span class="hidden sm:inline">Instituto Colombiano para la Evaluación de la Educación - ICFES</span>
+            </span>
+            <span class="text-white/90 font-medium">Plataforma Interna de Gestión PQRS</span>
+        </div>
+    </div>
+
+    <!-- HEADER INSTITUCIONAL BLANCO -->
+    <header class="bg-white border-b border-icfes-border sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-4">
+            <!-- Logo SVG Institucional estilo ICFES -->
+            <div class="flex items-center gap-3.5">
+                <div class="flex items-center gap-1.5 select-none">
+                    <span class="font-display font-extrabold text-2xl sm:text-3xl tracking-tight text-icfes-navy">icfes</span>
+                    <!-- Destello institucional tricolor/verde-azul -->
+                    <svg class="w-6 h-6 -mt-3" viewBox="0 0 32 32" fill="none">
+                        <path d="M16 2L18.5 11.5L28 14L18.5 16.5L16 26L13.5 16.5L4 14L13.5 11.5L16 2Z" fill="#4E8A3D"/>
+                        <circle cx="24" cy="7" r="3" fill="#1CA39E"/>
+                        <circle cx="8" cy="22" r="2.5" fill="#0B4A7E"/>
+                    </svg>
                 </div>
+                <div class="h-7 w-px bg-slate-200 hidden sm:block"></div>
                 <div>
-                    <h1 class="text-lg font-bold tracking-tight text-white">Asistente PQRS — ICES</h1>
-                    <p class="text-xs text-slate-400 flex items-center gap-2">
+                    <h1 class="text-sm sm:text-base font-bold text-icfes-deep leading-tight">Asistente Inteligente PQRS</h1>
+                    <p class="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
                         <span id="indicador-servidor" class="inline-block w-2 h-2 rounded-full bg-amber-400"></span>
                         <span id="texto-servidor">Conectando con motor documental...</span>
                     </p>
                 </div>
             </div>
 
-            <div id="barra-sesion" class="hidden flex items-center gap-3">
-                <span id="badge-rol" class="text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-full bg-slate-800 border border-slate-700 text-amber-400"></span>
-                <button onclick="cerrarSesion()" class="text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-3.5 py-2 rounded-xl transition">
+            <!-- Controles de Sesión -->
+            <div id="barra-sesion" class="hidden flex items-center gap-2.5 sm:gap-3">
+                <span id="badge-rol" class="text-xs font-bold px-3.5 py-1.5 rounded-full bg-icfes-navy/10 text-icfes-navy border border-icfes-navy/20"></span>
+                <button onclick="cerrarSesion()" class="pill-btn text-xs font-semibold text-white bg-icfes-navy hover:bg-icfes-deep px-4 py-2 rounded-full">
                     Cerrar sesión
                 </button>
             </div>
         </div>
     </header>
 
-    <main class="max-w-6xl mx-auto px-6 py-8">
+    <!-- CONTENIDO PRINCIPAL -->
+    <main class="flex-1 flex flex-col">
 
-        <!-- VISTA 1: LOGIN DUAL (ADMINISTRATIVO / COLABORADOR) -->
-        <section id="vista-login" class="max-w-md mx-auto mt-10">
-            <div class="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl">
-                <div class="mb-6">
-                    <span class="text-xs uppercase tracking-widest text-amber-400 font-bold">Acceso Institucional</span>
-                    <h2 class="text-2xl font-black text-white mt-1">Ingreso al Sistema</h2>
-                    <p class="text-sm text-slate-400 mt-1">Selecciona tu perfil operativo para continuar.</p>
-                </div>
-
-                <!-- Selector de Perfil -->
-                <div class="grid grid-cols-2 gap-3 mb-6">
-                    <button type="button" id="btn-perfil-colab" onclick="seleccionarPerfil('colaborador')"
-                        class="p-3.5 rounded-2xl border-2 border-amber-500 bg-amber-500/10 text-left transition">
-                        <div class="text-sm font-bold text-white">Colaborador</div>
-                        <div class="text-xs text-slate-400 mt-0.5">Consulta y redacción PQRS</div>
-                    </button>
-                    <button type="button" id="btn-perfil-admin" onclick="seleccionarPerfil('admin')"
-                        class="p-3.5 rounded-2xl border-2 border-slate-800 bg-slate-950/60 hover:border-slate-700 text-left transition">
-                        <div class="text-sm font-bold text-white">Administrativo</div>
-                        <div class="text-xs text-slate-400 mt-0.5">Gestión de manuales PDF</div>
-                    </button>
-                </div>
-
-                <form onsubmit="iniciarSesion(event)" class="space-y-4">
-                    <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-                            Clave de acceso (<span id="label-perfil-activo">Colaborador</span>)
-                        </label>
-                        <input type="password" id="input-password" required placeholder="••••••••••••"
-                            class="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-3 text-sm text-white outline-none transition">
+        <!-- VISTA 1: LOGIN INSTITUCIONAL ICFES -->
+        <section id="vista-login" class="icfes-login-bg flex-1 flex items-center justify-center px-4 py-12">
+            <div class="w-full max-w-md animate-view">
+                <div class="bg-white rounded-2xl shadow-2xl p-7 sm:p-9 border border-white/40">
+                    <!-- Marca ICFES -->
+                    <div class="flex items-center justify-between mb-6">
+                        <div class="flex items-center gap-1.5">
+                            <span class="font-display font-extrabold text-3xl text-icfes-navy">icfes</span>
+                            <svg class="w-6 h-6 -mt-3" viewBox="0 0 32 32" fill="none">
+                                <path d="M16 2L18.5 11.5L28 14L18.5 16.5L16 26L13.5 16.5L4 14L13.5 11.5L16 2Z" fill="#4E8A3D"/>
+                                <circle cx="24" cy="7" r="3" fill="#1CA39E"/>
+                            </svg>
+                        </div>
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-icfes-teal bg-icfes-teal/10 px-3 py-1 rounded-full">
+                            Acceso Seguro
+                        </span>
                     </div>
 
-                    <div id="login-error" class="hidden text-xs text-rose-400 bg-rose-950/50 border border-rose-900/60 rounded-xl p-3"></div>
+                    <h2 class="text-2xl font-bold text-slate-900">Iniciar sesión</h2>
+                    <p class="text-sm text-slate-500 mt-1 mb-6">Selecciona tu perfil institucional para ingresar al asistente.</p>
 
-                    <button type="submit" id="btn-ingresar"
-                        class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-3 rounded-xl text-sm transition shadow-lg">
-                        Ingresar al Asistente
-                    </button>
-                </form>
+                    <!-- Selector de Perfil con Iconografía SVG -->
+                    <div class="grid grid-cols-2 gap-3 mb-6">
+                        <button type="button" id="btn-perfil-colab" onclick="seleccionarPerfil('colaborador')"
+                            class="p-3.5 rounded-xl border-2 border-icfes-navy bg-icfes-navy/5 text-left transition-all">
+                            <div class="flex items-center gap-2 text-icfes-navy font-bold text-sm">
+                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                </svg>
+                                <span>Colaborador</span>
+                            </div>
+                            <div class="text-[11px] text-slate-500 mt-1">Atención y redacción PQRS</div>
+                        </button>
 
-                <div class="mt-6 pt-5 border-t border-slate-800/80 flex items-start gap-2.5 text-xs text-slate-400">
-                    <span class="text-emerald-400 font-bold">🛡️</span>
-                    <p><strong>Protección Habeas Data activa:</strong> Los datos personales (cédulas, correos, teléfonos y nombres) se anonimizan automáticamente antes del análisis.</p>
+                        <button type="button" id="btn-perfil-admin" onclick="seleccionarPerfil('admin')"
+                            class="p-3.5 rounded-xl border-2 border-slate-200 bg-white hover:border-icfes-navy/40 text-left transition-all">
+                            <div class="flex items-center gap-2 text-slate-700 font-bold text-sm">
+                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                </svg>
+                                <span>Administrativo</span>
+                            </div>
+                            <div class="text-[11px] text-slate-500 mt-1">Gestión de manuales PDF</div>
+                        </button>
+                    </div>
+
+                    <form onsubmit="iniciarSesion(event)" class="space-y-5">
+                        <div>
+                            <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
+                                Contraseña (<span id="label-perfil-activo" class="text-icfes-navy">Colaborador</span>)
+                            </label>
+                            <input type="password" id="input-password" required placeholder="Ingresa tu clave institucional"
+                                class="w-full bg-white border-b-2 border-slate-300 focus:border-icfes-navy px-2 py-2.5 text-sm text-slate-900 outline-none transition-colors">
+                        </div>
+
+                        <div id="login-error" class="hidden text-xs font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded-xl p-3"></div>
+
+                        <div class="flex justify-end pt-1">
+                            <button type="submit" id="btn-ingresar"
+                                class="pill-btn w-full sm:w-auto bg-icfes-navy hover:bg-icfes-deep text-white font-semibold px-8 py-2.5 rounded-full text-sm shadow-md">
+                                Siguiente
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Tarjeta inferior estilo "Opciones de inicio de sesión" ICFES -->
+                <div class="mt-3 bg-white/95 backdrop-blur rounded-xl px-5 py-3.5 shadow-lg flex items-center gap-3 text-xs text-slate-600">
+                    <svg class="w-5 h-5 text-icfes-teal shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                    </svg>
+                    <span><strong>Habeas Data Activo:</strong> Protección automática de datos personales (Ley 1581 de 2012).</span>
                 </div>
             </div>
         </section>
 
-        <!-- VISTA 2: PANEL OPERATIVO -->
-        <section id="vista-panel" class="hidden space-y-8">
+        <!-- VISTA 2: PANEL OPERATIVO INSTITUCIONAL -->
+        <section id="vista-panel" class="hidden max-w-7xl w-full mx-auto px-4 sm:px-6 py-7 space-y-6 animate-view">
 
-            <!-- BLOQUE EXCLUSIVO ADMINISTRADOR: GESTIÓN DE MANUALES PDF -->
-            <div id="modulo-admin" class="hidden bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
-                <div class="flex flex-wrap items-center justify-between gap-4 mb-5">
-                    <div>
-                        <span class="text-xs uppercase tracking-widest text-amber-400 font-bold">Base Documental Oficial</span>
-                        <h2 class="text-xl font-bold text-white">Manuales Institucionales ICES (Máx. 5 PDFs · 20 MB c/u)</h2>
+            <!-- MÓDULO ADMINISTRATIVO: GESTIÓN DOCUMENTAL -->
+            <div id="modulo-admin" class="hidden bg-white border border-icfes-border rounded-2xl p-5 sm:p-7 shadow-sm card-hover">
+                <div class="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-icfes-navy/10 text-icfes-navy flex items-center justify-center">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <span class="text-[11px] font-bold uppercase tracking-wider text-icfes-teal">Repositorio Normativo</span>
+                            <h2 class="text-lg font-bold text-icfes-deep">Manuales Institucionales ICFES (Máx. 5 PDFs · 20 MB c/u)</h2>
+                        </div>
                     </div>
-                    <span id="contador-docs" class="text-xs font-semibold bg-slate-800 text-slate-300 px-3 py-1.5 rounded-full">
+                    <span id="contador-docs" class="text-xs font-bold bg-icfes-navy text-white px-4 py-1.5 rounded-full">
                         0 / 5 cargados
                     </span>
                 </div>
 
-                <div class="grid md:grid-cols-3 gap-6">
-                    <!-- Formulario Subida PDF -->
-                    <div class="bg-slate-950/70 border border-dashed border-slate-700 rounded-2xl p-5 flex flex-col justify-between">
+                <div class="grid md:grid-cols-3 gap-6 mt-5">
+                    <!-- Subida -->
+                    <div class="bg-icfes-light border-2 border-dashed border-icfes-navy/25 rounded-2xl p-5 flex flex-col justify-between">
                         <div>
-                            <label class="block text-sm font-semibold text-white mb-1">Cargar nuevo manual PDF</label>
-                            <p class="text-xs text-slate-400 mb-4">El asistente responderá estrictamente con base en estos documentos.</p>
+                            <label class="block text-sm font-bold text-icfes-deep mb-1">Cargar nuevo documento PDF</label>
+                            <p class="text-xs text-slate-500 mb-4">El asistente fundamentará sus respuestas estrictamente en estas fuentes.</p>
                             <input type="file" id="input-pdf" accept="application/pdf"
-                                class="block w-full text-xs text-slate-300 file:mr-3 file:py-2 file:px-3.5 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-amber-500 file:text-slate-950 hover:file:bg-amber-400 cursor-pointer">
+                                class="block w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-icfes-navy file:text-white hover:file:bg-icfes-deep cursor-pointer">
                         </div>
                         <button onclick="subirManual()" id="btn-subir-pdf"
-                            class="mt-4 w-full bg-slate-800 hover:bg-slate-700 text-white font-semibold py-2.5 rounded-xl text-xs transition">
+                            class="pill-btn mt-4 w-full bg-icfes-teal hover:bg-teal-700 text-white font-bold py-2.5 rounded-full text-xs shadow-sm">
                             Subir y Procesar PDF
                         </button>
                     </div>
 
-                    <!-- Lista de Manuales Activos -->
-                    <div class="md:col-span-2 bg-slate-950/40 border border-slate-800/80 rounded-2xl p-5">
-                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Documentos activos en memoria</h3>
+                    <!-- Listado -->
+                    <div class="md:col-span-2 bg-icfes-light/60 border border-icfes-border rounded-2xl p-5">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Documentos activos en memoria</h3>
                         <div id="lista-documentos-admin" class="space-y-2.5">
-                            <p class="text-xs text-slate-500">Cargando documentos...</p>
+                            <p class="text-xs text-slate-500">Verificando documentos...</p>
                         </div>
                     </div>
                 </div>
-                <div id="alerta-admin" class="hidden mt-4 text-xs rounded-xl p-3"></div>
+                <div id="alerta-admin" class="hidden mt-4 text-xs font-medium rounded-xl p-3.5"></div>
             </div>
 
-            <!-- ESTADO DOCUMENTAL PARA COLABORADOR -->
-            <div id="banner-docs-colaborador" class="hidden bg-slate-900/80 border border-slate-800 rounded-2xl px-5 py-3.5 flex flex-wrap items-center justify-between gap-3">
+            <!-- BANNER DE FUENTES PARA COLABORADOR -->
+            <div id="banner-docs-colaborador" class="hidden bg-white border border-icfes-border rounded-2xl px-5 py-3.5 shadow-sm flex flex-wrap items-center justify-between gap-3">
                 <div class="flex items-center gap-2.5 text-xs">
-                    <span class="text-emerald-400 font-bold">📚 Fuentes oficiales activas:</span>
-                    <span id="nombres-docs-colab" class="text-slate-300">Verificando...</span>
+                    <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-icfes-teal/15 text-icfes-teal font-bold">✓</span>
+                    <span class="font-bold text-icfes-deep">Fuentes oficiales activas:</span>
+                    <span id="nombres-docs-colab" class="text-slate-600 font-medium">Verificando...</span>
                 </div>
-                <span class="text-[11px] text-slate-400">Modo Cero Alucinaciones · Solo fuentes ICES</span>
+                <span class="text-[11px] font-semibold text-icfes-navy bg-icfes-navy/10 px-3 py-1 rounded-full">
+                    Grounding Estricto · Solo fuentes ICFES
+                </span>
             </div>
 
-            <!-- ÁREA DE TRABAJO PQRS (PARA AMBOS ROLES) -->
-            <div class="grid lg:grid-cols-12 gap-6">
-                <!-- Columna Izquierda: Entrada de PQRS / Consulta -->
-                <div class="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl flex flex-col justify-between">
+            <!-- ÁREA DE TRABAJO PRINCIPAL (RESPONSIVE 12 COLUMNAS) -->
+            <div class="grid lg:grid-cols-12 gap-6 items-stretch">
+
+                <!-- PANEL IZQUIERDO: SOLICITUD / PQRS -->
+                <div class="lg:col-span-5 bg-white border border-icfes-border rounded-2xl p-5 sm:p-6 shadow-sm flex flex-col justify-between card-hover">
                     <div>
-                        <div class="flex items-center justify-between mb-4">
-                            <span class="text-xs uppercase tracking-widest text-amber-400 font-bold">1. Solicitud</span>
-                            <span class="text-[11px] text-emerald-400 font-medium bg-emerald-950/60 border border-emerald-900 px-2.5 py-0.5 rounded-full">
-                                🛡️ Cifrado PII Activo
+                        <div class="flex items-center justify-between gap-2 pb-4 border-b border-slate-100">
+                            <div>
+                                <span class="text-[11px] font-bold uppercase tracking-wider text-icfes-teal">Paso 1</span>
+                                <h3 class="text-base font-bold text-icfes-deep">Solicitud o Consulta</h3>
+                            </div>
+                            <span class="inline-flex items-center gap-1.5 text-[11px] font-bold text-icfes-green bg-icfes-green/10 border border-icfes-green/25 px-3 py-1 rounded-full">
+                                <span class="w-1.5 h-1.5 rounded-full bg-icfes-green"></span>
+                                Cifrado PII Activo
                             </span>
                         </div>
 
-                        <!-- Selector de Modo -->
-                        <label class="block text-xs font-semibold text-slate-400 mb-2">Tipo de asistencia requerida</label>
-                        <div class="grid grid-cols-2 gap-2.5 mb-5">
+                        <!-- Selector de Modo estilo Tarjetas ICFES -->
+                        <label class="block text-xs font-bold text-slate-600 mt-4 mb-2">Modalidad de atención</label>
+                        <div class="grid grid-cols-2 gap-3 mb-4">
                             <button type="button" id="modo-respuesta" onclick="seleccionarModo('respuesta_pqrs')"
-                                class="p-3 rounded-xl border border-amber-500 bg-amber-500/10 text-left transition">
-                                <div class="text-xs font-bold text-white">Redactar PQRS</div>
-                                <div class="text-[11px] text-slate-400 mt-0.5">Borrador oficial completo</div>
+                                class="p-3.5 rounded-xl border-2 border-icfes-navy bg-icfes-navy/5 text-left transition-all">
+                                <div class="text-xs font-bold text-icfes-navy flex items-center gap-1.5">
+                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                    </svg>
+                                    <span>Redactar PQRS</span>
+                                </div>
+                                <div class="text-[11px] text-slate-500 mt-1">Carta formal + soporte</div>
                             </button>
+
                             <button type="button" id="modo-consulta" onclick="seleccionarModo('consulta_normativa')"
-                                class="p-3 rounded-xl border border-slate-800 bg-slate-950/60 hover:border-slate-700 text-left transition">
-                                <div class="text-xs font-bold text-white">Consulta Interna</div>
-                                <div class="text-[11px] text-slate-400 mt-0.5">Plazos, reglas y citas</div>
+                                class="p-3.5 rounded-xl border-2 border-slate-200 bg-white hover:border-icfes-navy/40 text-left transition-all">
+                                <div class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+                                    </svg>
+                                    <span>Consulta Interna</span>
+                                </div>
+                                <div class="text-[11px] text-slate-500 mt-1">Chat con manuales</div>
                             </button>
                         </div>
 
-                        <label for="texto-pqrs" class="block text-xs font-semibold text-slate-400 mb-2">
-                            Pega el texto de la PQRS o escribe tu pregunta
-                        </label>
-                        <textarea id="texto-pqrs" rows="9"
-                            placeholder="Ej: Peticionario: Juan Pérez, CC 79.123.456. Solicita información sobre los tiempos de respuesta y requisitos para..."
-                            class="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-2xl p-4 text-sm text-slate-100 placeholder-slate-600 outline-none resize-none transition"></textarea>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label for="texto-pqrs" class="text-xs font-bold text-slate-600">
+                                Escribe tu consulta o pega la PQRS
+                            </label>
+                            <!-- Botón Dictado por Voz (Micrófono) -->
+                            <button type="button" id="btn-dictar" onclick="alternarDictadoVoz()" title="Dictar por micrófono"
+                                class="inline-flex items-center gap-1 text-[11px] font-semibold text-icfes-navy hover:text-icfes-teal transition">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
+                                </svg>
+                                <span id="label-dictar">Dictar</span>
+                            </button>
+                        </div>
+
+                        <textarea id="texto-pqrs" rows="8"
+                            placeholder="Ej: Hola, soy Juan Pérez, CC 79.123.456. Realicé un pago doble por PSE y solicito información para el reembolso..."
+                            class="w-full bg-icfes-light/70 border border-icfes-border focus:border-icfes-navy focus:bg-white rounded-xl p-3.5 text-sm text-slate-800 placeholder-slate-400 outline-none resize-none transition-all"></textarea>
                     </div>
 
-                    <div class="mt-4">
+                    <div class="mt-4 flex flex-col sm:flex-row gap-2.5">
                         <button onclick="procesarConsulta()" id="btn-consultar"
-                            class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-3.5 rounded-2xl text-sm transition shadow-lg">
+                            class="pill-btn flex-1 bg-icfes-navy hover:bg-icfes-deep text-white font-bold py-3 px-6 rounded-full text-sm shadow-md">
                             Analizar y Generar Respuesta
+                        </button>
+                        <button type="button" onclick="limpiarConversacion()" title="Iniciar nueva conversación"
+                            class="pill-btn bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-3 px-4 rounded-full text-xs">
+                            Limpiar
                         </button>
                     </div>
                 </div>
 
-                <!-- Columna Derecha: Resultado Fundamentado -->
-                <div class="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl flex flex-col">
-                    <div class="flex flex-wrap items-center justify-between gap-2 pb-4 border-b border-slate-800">
+                <!-- PANEL DERECHO: RESPUESTA + LECTOR DE VOZ -->
+                <div class="lg:col-span-7 bg-white border border-icfes-border rounded-2xl p-5 sm:p-6 shadow-sm flex flex-col card-hover">
+                    <div class="flex flex-wrap items-center justify-between gap-2 pb-4 border-b border-slate-100">
                         <div>
-                            <span class="text-xs uppercase tracking-widest text-amber-400 font-bold">2. Respuesta Fundamentada</span>
-                            <h3 class="text-base font-bold text-white">Resultado basado en Manuales ICES</h3>
+                            <span class="text-[11px] font-bold uppercase tracking-wider text-icfes-teal">Paso 2</span>
+                            <h3 class="text-base font-bold text-icfes-deep">Respuesta Fundamentada ICFES</h3>
                         </div>
-                        <div class="flex items-center gap-2">
-                            <span id="badge-habeas" class="hidden text-[11px] font-semibold bg-emerald-950 text-emerald-300 border border-emerald-800 px-2.5 py-1 rounded-lg"></span>
+
+                        <!-- Barra de Acciones: Habeas Data + Lector por Voz + Copiar -->
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span id="badge-habeas" class="hidden text-[11px] font-bold bg-icfes-green/10 text-icfes-green border border-icfes-green/25 px-3 py-1 rounded-full"></span>
+
+                            <button onclick="alternarLectorVoz()" id="btn-voz"
+                                class="hidden pill-btn inline-flex items-center gap-1.5 text-xs font-bold bg-icfes-teal/15 hover:bg-icfes-teal hover:text-white text-icfes-teal px-3.5 py-1.5 rounded-full">
+                                <svg id="icono-voz-quieto" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/>
+                                </svg>
+                                <span id="ecualizador-voz" class="hidden items-center gap-0.5 h-3">
+                                    <span class="voice-bar"></span><span class="voice-bar"></span><span class="voice-bar"></span>
+                                </span>
+                                <span id="texto-btn-voz">Escuchar</span>
+                            </button>
+
                             <button onclick="copiarRespuesta()" id="btn-copiar"
-                                class="hidden text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-xl transition">
+                                class="hidden pill-btn text-xs font-bold bg-icfes-navy hover:bg-icfes-deep text-white px-4 py-1.5 rounded-full">
                                 Copiar texto
                             </button>
                         </div>
                     </div>
 
-                    <div id="contenedor-respuesta" class="mt-4 flex-1 bg-slate-950/70 border border-slate-800/80 rounded-2xl p-5 overflow-y-auto max-h-[520px]">
-                        <p class="text-sm text-slate-500">
-                            Aquí aparecerá el borrador oficial de respuesta o el concepto normativo respaldado con citas exactas de los manuales PDF del ICES.
-                        </p>
+                    <div id="contenedor-respuesta" class="mt-4 flex-1 bg-icfes-light/70 border border-icfes-border rounded-xl p-4 sm:p-5 overflow-y-auto max-h-[520px] transition-all">
+                        <div class="flex items-start gap-3 text-slate-600">
+                            <div class="w-8 h-8 rounded-full bg-icfes-navy text-white flex items-center justify-center font-display font-bold text-xs shrink-0 mt-0.5">
+                                IA
+                            </div>
+                            <div class="text-sm leading-relaxed">
+                                <p class="font-semibold text-icfes-deep">¡Bienvenido al Asistente PQRS del ICFES!</p>
+                                <p class="mt-1 text-slate-500">Escríbeme una consulta normativa o pega el texto de una solicitud ciudadana. Generaré una respuesta institucional fundamentada y podrás escucharla con el lector de voz integrado.</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </section>
     </main>
+
+    <!-- FOOTER INSTITUCIONAL ICFES -->
+    <footer class="bg-white border-t-4 border-icfes-teal mt-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-600">
+            <div>
+                <p class="font-bold text-icfes-deep text-sm">Instituto Colombiano para la Evaluación de la Educación - ICFES</p>
+                <p class="text-slate-500 mt-0.5">Calle 26 No. 69-76, Torre 2, Piso 16, Edificio Elemento, Bogotá D.C. · Línea nacional: 601 9156101</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="px-3 py-1 rounded-full bg-icfes-light border border-icfes-border font-semibold text-icfes-navy">
+                    Ley 1581/2012 · Habeas Data
+                </span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- BOTÓN FLOTANTE DE ACCESIBILIDAD ESTILO PORTAL ICFES -->
+    <div class="fixed bottom-5 right-5 z-40 flex flex-col items-end gap-2">
+        <div id="menu-accesibilidad" class="hidden bg-white border border-icfes-border rounded-2xl shadow-xl p-3.5 w-52 space-y-2 animate-view">
+            <p class="text-[11px] font-bold uppercase tracking-wider text-icfes-navy px-1">Accesibilidad</p>
+            <button onclick="cambiarTamanoTexto(1)" class="w-full text-left text-xs font-semibold text-slate-700 hover:bg-icfes-light px-3 py-2 rounded-lg transition">
+                A+ Aumentar letra
+            </button>
+            <button onclick="cambiarTamanoTexto(-1)" class="w-full text-left text-xs font-semibold text-slate-700 hover:bg-icfes-light px-3 py-2 rounded-lg transition">
+                A- Disminuir letra
+            </button>
+            <button onclick="alternarContraste()" class="w-full text-left text-xs font-semibold text-slate-700 hover:bg-icfes-light px-3 py-2 rounded-lg transition">
+                ◐ Alto contraste
+            </button>
+        </div>
+
+        <button onclick="toggleMenuAccesibilidad()" title="Opciones de Accesibilidad"
+            class="pill-btn w-11 h-11 rounded-full bg-icfes-gov text-white shadow-lg flex items-center justify-center">
+            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2a2 2 0 110 4 2 2 0 010-4zm9 7h-6v13h-2v-6h-2v6H9V9H3V7h18v2z"/>
+            </svg>
+        </button>
+    </div>
 
     <script src="app.js"></script>
 </body>
