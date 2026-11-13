@@ -102,9 +102,21 @@ async function iniciarSesion(e) {
 function cerrarSesion() {
     tokenSesion = "";
     rolSesion = "";
+    ultimaRespuestaTexto = "";
     historialChat = [];
     sessionStorage.removeItem("ices_token");
     sessionStorage.removeItem("ices_rol");
+
+    // Limpiar campos y respuestas anteriores en pantalla (Habeas Data)
+    document.getElementById("texto-pqrs").value = "";
+    document.getElementById("badge-habeas").classList.add("hidden");
+    document.getElementById("btn-copiar").classList.add("hidden");
+    document.getElementById("contenedor-respuesta").innerHTML = `
+        <p class="text-sm text-slate-500">
+            Hola 👋 Soy tu Asistente IA del ICES. Escríbeme una consulta sobre los documentos cargados o pega el texto de una PQRS para ayudarte a redactar la respuesta.
+        </p>
+    `;
+
     document.getElementById("vista-panel").classList.add("hidden");
     document.getElementById("barra-sesion").classList.add("hidden");
     document.getElementById("vista-login").classList.remove("hidden");
